@@ -119,7 +119,7 @@ class PDRecon:
             
             if wordlist:
                 print(f"[*] Aggressive Mode: Running DNS Bruteforce with {wordlist}")
-                cmd_dns.extend(["-w", wordlist])
+                cmd_dns.extend(["-d", self.target, "-w", wordlist])
             else:
                 print("[!] Aggressive Mode: No wordlist found for DNS bruteforce. Skipping.")
 
@@ -128,19 +128,24 @@ class PDRecon:
         # 3. Port Scanning (Naabu) - ONLY Medium/Aggressive
         ports_file = os.path.join(self.workspace, "open_ports.txt")
         if self.mode in ["medium", "aggressive"]:
-            # naabu -list active_subdomains.txt ...
-            cmd_naabu = ["naabu", "-list", active_subs_file, "-silent", "-o", ports_file]
-            if self.mode == "medium":
-                cmd_naabu.extend(["-top-ports", "100"])
-            elif self.mode == "aggressive":
-                cmd_naabu.extend(["-top-ports", "1000"]) # or -p -
-            
-            self.run_cmd(cmd_naabu)
-            if os.path.exists(ports_file) and os.path.getsize(ports_file) > 0:
-                target_list_for_httpx = ports_file
+            # Check if active_subdomains.txt exists and is not empty
+            if not os.path.exists(active_subs_file) or os.path.getsize(active_subs_file) == 0:
+                 print("[-] Active subdomains file not found or empty. Skipping port scan.")
+                 target_list_for_httpx = active_subs_file # Fallback
             else:
-                print("[-] Port scan failed or no ports found. Falling back to subdomains for HTTP probing.")
-                target_list_for_httpx = active_subs_file
+                 # naabu -list active_subdomains.txt ...
+                 cmd_naabu = ["naabu", "-list", active_subs_file, "-silent", "-o", ports_file]
+                 if self.mode == "medium":
+                    cmd_naabu.extend(["-top-ports", "100"])
+                 elif self.mode == "aggressive":
+                    cmd_naabu.extend(["-top-ports", "1000"]) # or -p -
+            
+                 self.run_cmd(cmd_naabu)
+                 if os.path.exists(ports_file) and os.path.getsize(ports_file) > 0:
+                    target_list_for_httpx = ports_file
+                 else:
+                    print("[-] Port scan failed or no ports found. Falling back to subdomains for HTTP probing.")
+                    target_list_for_httpx = active_subs_file
         else:
             target_list_for_httpx = active_subs_file # Use subdomains for Low mode
 
